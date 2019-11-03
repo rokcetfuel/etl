@@ -1,0 +1,28 @@
+
+/* 
+ *  Settings
+ */
+
+$app_w-padding: 30px;
+$app_h-padding: 30px;
+
+$h_header: 80px;
+$h_navigation: 80px;
+
+/* 
+ *  Colours
+ */
+
+$col_body-background: $c_white;
+$col_body-text: $c_cool-grey;
+$col_body-h1: $c_white;
+
+$col_header-background: $c_black;
+$col_header-h1: $c_white;
+
+/* 
+ *  Automated variables 
+ */
+
+$p_page-top: $h_header + $app_h-padding;
+$p_page-bottom: $h_navigation + $app_h-padding;

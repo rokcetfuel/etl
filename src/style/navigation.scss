@@ -1,0 +1,48 @@
+
+.app__navigation {
+	position: fixed;
+	bottom: 0;
+	right: 0;
+	left: 0;
+	padding: 20px 0 35px 0;
+	width: 100%;
+	backdrop-filter: blur(8px);
+	height: $h_navigation;
+}
+
+.app__navigation-inner {
+	display: flex;
+	justify-content: space-around;
+	flex-wrap: nowrap;
+}
+
+.app__navigation-a {
+	position: relative;
+	opacity:0.5;
+
+	img {
+		width: 20px;
+		height: 20px;
+	}
+
+	&:hover {
+		opacity:1;
+	}
+}
+
+.app__navigation-a.active {
+	opacity:1;
+
+	&:before {
+		content: '';
+		position: absolute;
+		top: 28px;
+    right: 0;
+    left: 0;
+    margin: auto;
+    background: #000;
+    border-radius: 12px;
+    height: 6px;
+    width: 6px;
+	}
+}

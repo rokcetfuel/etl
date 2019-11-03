@@ -1,0 +1,36 @@
+
+.page-title {
+	width: 100%;
+	text-align: center;
+	position: fixed;
+	top: 0;
+	right: 0;
+	left: 0;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	height: $h_header;
+	background: $col_header-background;
+
+	.page-title_span {
+		font-size: 28px;
+		font-weight: 600;
+		display: inline-block;
+		position: relative;
+		color: $col_header-h1;
+		
+		&:before {
+			content: '';
+			position: absolute;
+			bottom: 0;
+			right: 1px;
+			left: 1px;
+			height: 2px;
+			background: $col_header-h1;
+		}
+	}
+}
+
+.page-content {
+	padding: $p_page-top $app_w-padding $p_page-bottom $app_w-padding;
+}
