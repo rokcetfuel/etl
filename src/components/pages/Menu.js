@@ -2,6 +2,7 @@ import React, {Component} from 'react'
 import PageTitle from './partials/PageTitle.js'
 import db from '../../Database.js';
 import { CSVLink } from "react-csv";
+import { flatten } from '../../Helpers.js';
 
 class Menu extends Component {
 
@@ -16,45 +17,21 @@ class Menu extends Component {
     this.resetDB = this.resetDB.bind(this)
     this.prepareExport = this.prepareExport.bind(this)
     this.exportCSV = this.exportCSV.bind(this)
-    this.flatten = this.flatten.bind(this)
   }
 
-  flatten(data) {
-    var result = {};
-    function recurse(cur, prop) {
-        if (Object(cur) !== cur) {
-            result[prop] = cur;
-        } else if (Array.isArray(cur)) {
-            for (var i = 0, l = cur.length; i < l; i++)
-            recurse(cur[i], prop + "[" + i + "]");
-            if (l === 0) result[prop] = [];
-        } else {
-            var isEmpty = true;
-            for (var p in cur) {
-                isEmpty = false;
-                recurse(cur[p], prop ? prop + "_" + p : p);
-            }
-            if (isEmpty && prop) result[prop] = {};
-        }
-    }
-    recurse(data, "");
-    return result;
-  };
-
-
   resetDB() {
-    let confirmDbReset = window.confirm('Na pewno chcesz zresetować bazę danych?')
+    let confirmDbReset = window.confirm('Are you sure you want to reset the database?')
     if (confirmDbReset) {
       this.setState({
         alert: ''
       });
       db.recipes.clear().then(() => {
         this.setState({
-          alert: 'Baza danych została zresetowana.'
+          alert: 'Database has been reset.'
         });
       }).catch((err) => {
         this.setState({
-          alert: 'Nie udało się wyczyścić bazy danych.'
+          alert: 'There was a problem with resetting the database.'
         });
       });
     } else {
@@ -69,7 +46,7 @@ class Menu extends Component {
       let newArray = [];
 
       jsonDB.forEach((record) => {
-        let newRecord = this.flatten(record);
+        let newRecord = flatten(record);
         newArray.push(newRecord);
       });
 
@@ -96,14 +73,14 @@ class Menu extends Component {
         <div className="page-content">
           <div className="menu__buttons">
             <div className="menu__button-wrap">
-              <button className="btn" onClick={this.resetDB}>Reset Bazy Danych</button>
+              <button className="btn" onClick={this.resetDB}>Reset database</button>
             </div>
             <div className="menu__button-wrap">
-              <button className="btn" onClick={this.prepareExport}>Wygeneruj CSV</button>
+              <button className="btn" onClick={this.prepareExport}>Generate CSV</button>
             </div>
             <div className="menu__button-wrap">
               {this.state.jsonReady ? 
-                <CSVLink onClick={this.exportCSV} data={this.state.jsonDB} filename={"data.csv"} className="btn">Pobierz</CSVLink>
+                <CSVLink onClick={this.exportCSV} data={this.state.jsonDB} filename={"data.csv"} className="btn">Download</CSVLink>
               : '' }
             </div>
           </div>

@@ -11,6 +11,7 @@
 	align-items: center;
 	height: $h_header;
 	background: $col_header-background;
+	z-index: 999;
 
 	.page-title_span {
 		font-size: 28px;

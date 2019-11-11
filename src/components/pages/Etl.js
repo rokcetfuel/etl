@@ -1,6 +1,5 @@
 import React, {Component} from 'react'
 import PageTitle from './partials/PageTitle.js'
-//import PageContent from './partials/PageContent.js'
 
 class Etl extends Component {
   render() {
@@ -11,10 +10,10 @@ class Etl extends Component {
           
           <div className="etl__home-buttons">
             <div className="etl__home-buttons__wrap">
-        		  <button className="btn">Pełen proces ETL</button>
+        		  <button disabled className="btn">Full ETL Process</button>
             </div>
             <div className="etl__home-buttons__wrap">
-        		  <button className="btn">Krok po kroku</button>
+        		  <button disabled className="btn">ETL Step by step</button>
             </div>
           </div>
 

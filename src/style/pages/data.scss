@@ -1,0 +1,14 @@
+
+.page__data-table {
+	max-width: 100%;
+
+	.MuiTableCell-root {
+		font-family: inherit;
+		padding: 10px;
+		line-height: 1.4;
+	}
+
+	.MuiTableCell-head {
+		white-space: nowrap;
+	}
+}

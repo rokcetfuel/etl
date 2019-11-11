@@ -12,7 +12,7 @@ class View extends Component {
 
     return (
 	    <Switch>
-	      <Route path="/etl">
+	      <Route path="/home">
 	        <Etl/>
 	      </Route>
 	      <Route path="/menu">
@@ -21,7 +21,7 @@ class View extends Component {
 	      <Route path="/data">
 	        <Data data={data}/>
 	      </Route>
-	      <Redirect from="/" to="/etl" />
+	      <Redirect from="/" to="/home" />
 	    </Switch>
     );
   }

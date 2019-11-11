@@ -59,3 +59,42 @@ class App extends Component {
 }
 
 export default App;
+
+<div style={{ maxWidth: "100%" }}>
+                <MaterialTable
+                  columns={[
+                    { title: "Name", field: "name" },
+                    { title: "Surname", field: "surname" },
+                    { title: "Year", field: "birthYear", type: "numeric" },
+                    { title: "City", field: "birthCity", lookup: { 1: "Aaaa", 2: "Zzzz", 3: "dd" }}
+                  ]}
+                  data={[
+                    { name: "Afnewfjk", surname: "Zrrr", birthYear: 1988, birthCity: 1 },
+                    { name: "Ffrfw", surname: "Dddd", birthYear: 1987, birthCity: 2 },
+                    { name: "Zefwer", surname: "BBBB", birthYear: 1989, birthCity: 3 }
+                  ]}
+                  title="Recipes"
+                />
+              </div>
+
+
+  // Get headers from DB, flat
+
+  prepareTable() {
+
+    db.recipes.toArray().then((jsonDB) => {
+      let arrayKeys = []
+      
+      jsonDB.forEach((record) => {
+        let newRecord = flatten(record)
+        let newRecordKeysArray = Object.keys(newRecord)
+        arrayKeys = unique(arrayKeys.concat(newRecordKeysArray))
+      });
+
+      console.log(arrayKeys)
+
+      this.setState({
+        tableHeaders: arrayKeys
+      })
+    });
+  }

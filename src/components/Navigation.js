@@ -18,7 +18,7 @@ class Navigation extends Component {
 		      </div>
 
 		      <div className="app__navigation-link">
-			      <NavLink className="app__navigation-a" to="/etl">
+			      <NavLink className="app__navigation-a" to="/home">
 			      	<img src={iconBolt} alt="Process" />
 			      </NavLink>
 		      </div>
