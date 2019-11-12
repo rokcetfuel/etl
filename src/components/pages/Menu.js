@@ -6,14 +6,15 @@ import { flatten } from '../../Helpers.js';
 
 class Menu extends Component {
 
-  state = {
-    alert: '',
-    jsonDB: '',
-    jsonReady: false
-  }
-
   constructor(props) {
     super(props);
+
+    this.state = {
+      alert: '',
+      jsonDB: '',
+      jsonReady: false
+    }
+  
     this.resetDB = this.resetDB.bind(this)
     this.prepareExport = this.prepareExport.bind(this)
     this.exportCSV = this.exportCSV.bind(this)

@@ -34,3 +34,5 @@ export function unique(array) {
 
     return a;
 }
+
+export const htmlParser = new DOMParser()

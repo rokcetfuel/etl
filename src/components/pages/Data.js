@@ -78,7 +78,7 @@ class Data extends Component {
               {this.state.isFetching ? <p>Chwilka...</p> : this.loadTable()}
             </div>
 
-            <a className="btn" onClick={() => this.handleAddRecipe('Hot Pot')}>Add test data to DB</a>
+            <button className="btn" onClick={() => this.handleAddRecipe('Hot Pot')}>Add test data to DB</button>
           </div>
       	</div>
     );
