@@ -27,6 +27,24 @@ class Etl extends Component {
   fullProcess() {
     this.setState({checker: 'Processing in progress...'})
 
+    this.getPages()
+    .then((response) => this.processPages(response) )
+    .then((response) => this.processRecipes(response) )
+    .then((response) => {
+      this.setState({
+        checker: 'Processing finished. Found '+ response.length +' recipes. ',
+        recipes: response
+      }, function() {
+        console.log(this.state.recipes)
+      })
+    }).catch((error) => {
+      console.log(error)
+    })
+  }
+
+  /*fullProcess() {
+    this.setState({checker: 'Processing in progress...'})
+
     this.getPages().then((response) => {
       if (response.pages) {
         this.processPages(response.pages).then((urls) => {
@@ -34,6 +52,8 @@ class Etl extends Component {
             this.setState({
               checker: 'Processing finished. Found '+ data.length +' recipes. ',
               recipes: data
+            }, function() {
+              console.log(this.state.recipes)
             })
 
             // Tutaj funkcja do wyciagniecia danych bo nie bedzie promisem chyba
@@ -47,7 +67,7 @@ class Etl extends Component {
     }).catch((error) => {
       console.log(error)
     })
-  }
+  }*/
 
   getPages() {
     return new Promise((resolve, refuse) => {
@@ -60,8 +80,8 @@ class Etl extends Component {
         let recipesContent = recipesHTML.getElementById('content')
         let recipesLastPage = recipesContent.querySelector('.nav-links .dots').nextElementSibling.innerHTML
 
-        if (recipesLastPage) resolve({pages: recipesLastPage})
-        else resolve({error: 'Could not find amount of pages.'})
+        if (recipesLastPage) resolve(recipesLastPage)
+        else refuse()
 
       }).catch((error) => {
         console.log('Fetch in getPages failed. ' + error)
@@ -165,7 +185,6 @@ class Etl extends Component {
         		  <button disabled className="btn">ETL Step by step</button>
             </div>
             <p>{this.state.checker}</p>
-            <p>{this.state.recipes}</p>
           </div>
 
       	</div>
