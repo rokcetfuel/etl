@@ -32,9 +32,13 @@ class Etl extends Component {
         this.processPages(response.pages).then((urls) => {
           this.processRecipes(urls).then((data) => {
             this.setState({
-              checker: 'Processing finished.',
+              checker: 'Processing finished. Found '+ data.length +' recipes. ',
               recipes: data
             })
+
+            // Tutaj funkcja do wyciagniecia danych bo nie bedzie promisem chyba
+
+            // A potem do zapisania do bazy, byc moze promise?
           })
         })
       } else {
@@ -92,26 +96,20 @@ class Etl extends Component {
     })
   }
 
-  fetchRecipe(recipeURL) {
 
+  fetchRecipe(recipeURL) {
     return new Promise((resolve, reject) => {
       fetchJsonp('http://www.whateverorigin.org/get?url=' + encodeURIComponent(recipeURL))
       .then((response) => {return response.json()})
       .then((json) => {
 
         let recipeHTML = htmlParser.parseFromString(json.contents, "text/html")
-        let recipeContainer = recipeHTML.getElementsByClassName('wprm-recipe-container')[0]
+        let recipeContainer = recipeHTML.getElementsByClassName('wprm-recipe-container')[0].innerHTML
 
         if (recipeContainer) {
-
-          let recipeTitle = recipeContainer.getElementsByClassName('wprm-recipe-name')[0].innerHTML
-
-          if (recipeTitle) {
-            resolve({data: recipeTitle})
-          } else {
-            resolve({error: 'Cannot find recipe title'})
-          }
-
+          // Answers with recipe container, 
+          // you'll get data from container in the next step
+          resolve({data: recipeContainer})
         } else {
           resolve({error: 'Cannot find recipe container'})
         }
@@ -135,9 +133,9 @@ class Etl extends Component {
         else console.log(response.error)
       })
     }
-
     return recipes
   }
+
 
   async processPages(pages) {
     let allURLs = []
@@ -149,18 +147,8 @@ class Etl extends Component {
         else console.log(response.error)
       })
     }
-
     return allURLs
   }
-
-  //if (recipesArray.length) {
-  //  console.log(recipesArray.length)
-  //  console.log(recipesArray)
-  //  good(recipesArray)
-  //} else {
-  //  bad(new Error('Smth went wrong'))
-  //}
-
 
 
   render() {
