@@ -24,3 +24,10 @@
 		color: #fff;
 	}
 }
+
+.btn:disabled,
+.btn[disabled] {
+	background: #000;
+	color: #fff;
+	cursor: default;
+}

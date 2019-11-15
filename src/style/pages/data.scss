@@ -1,5 +1,5 @@
 
-.page__data-table {
+.data__table {
 	max-width: 100%;
 
 	.MuiTableCell-root {
@@ -10,5 +10,20 @@
 
 	.MuiTableCell-head {
 		white-space: nowrap;
+	}
+}
+
+.data__table-loading {
+	text-align: center;
+	margin: 0 auto 20px;
+	max-width: 300px;
+
+	& > span {
+		display: inline-block;
+		background-image: linear-gradient(to right, black, black);
+  	background-position: 0 1.1em;
+  	background-repeat: repeat-x;
+  	background-size: 10px 2px;
+  	padding-bottom:4px;
 	}
 }

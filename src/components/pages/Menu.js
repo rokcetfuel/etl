@@ -12,37 +12,54 @@ class Menu extends Component {
     this.state = {
       alert: '',
       jsonDB: '',
-      jsonReady: false
+      jsonReady: false,
+      confirm: false
     }
   
-    this.resetDB = this.resetDB.bind(this)
     this.prepareExport = this.prepareExport.bind(this)
     this.exportCSV = this.exportCSV.bind(this)
+
+    this.startReset = this.startReset.bind(this)
+    this.doReset = this.doReset.bind(this)
+    this.stopReset = this.stopReset.bind(this)
   }
 
-  resetDB() {
-    let confirmDbReset = window.confirm('Are you sure you want to reset the database?')
-    if (confirmDbReset) {
+  startReset() {
+    this.setState({
+      confirm: true,
+      alert: '',
+      jsonReady: false
+    })
+  }
+
+  stopReset() {
+    this.setState({
+      confirm: false,
+      alert: ''
+    })
+  }
+
+  doReset() {
+    db.recipes.clear()
+    .then(() => {
       this.setState({
-        alert: ''
+        alert: 'Database has been reset.',
+        confirm: false
       });
-      db.recipes.clear().then(() => {
-        this.setState({
-          alert: 'Database has been reset.'
-        });
-      }).catch((err) => {
-        this.setState({
-          alert: 'There was a problem with resetting the database.'
-        });
-      });
-    } else {
+    }).catch((err) => {
       this.setState({
-        alert: ''
+        alert: 'Problem with the database reset. Try again.',
+        confirm: false
       });
-    }
+    });
   }
 
   prepareExport() {
+
+    this.setState({
+      confirm: false
+    })
+
     db.recipes.toArray().then((jsonDB) => {
       let newArray = [];
 
@@ -70,28 +87,61 @@ class Menu extends Component {
   render() {
     return (
 	    <div className="page page__menu">
-      	<PageTitle title="Menu"/>
+        <PageTitle title="Menu"/>
         <div className="page-content">
-          <div className="menu__buttons">
-            <div className="menu__button-wrap">
-              <button className="btn" onClick={this.resetDB}>Reset database</button>
+
+          {this.state.confirm ?
+            <div className="menu__reset-db">
+              <div className="menu__button-wrap">
+                <button className="btn" disabled>Reset database</button>
+              </div>
+              <div className="menu__confirm">
+                <div className="menu__confirm-wrap">
+                  <span>Are you sure?</span>
+                  <div className="menu__confirm-buttons">
+                    <button className="btn" onClick={this.doReset}>Yes</button>
+                    <button className="btn" onClick={this.stopReset}>No</button>
+                  </div>
+                </div>
+              </div>
             </div>
+          :
+          <div className="menu__reset-db">
             <div className="menu__button-wrap">
-              <button className="btn" onClick={this.prepareExport}>Generate CSV</button>
-            </div>
-            <div className="menu__button-wrap">
-              {this.state.jsonReady ? 
-                <CSVLink onClick={this.exportCSV} data={this.state.jsonDB} filename={"data.csv"} className="btn">Download</CSVLink>
-              : '' }
+              <button className="btn" onClick={this.startReset}>Reset database</button>
             </div>
           </div>
+          }
+
+          {this.state.jsonReady ? 
+            <div className="menu__export-csv">
+              <div className="menu__button-wrap">
+                <button className="btn" disabled>Generate CSV</button>
+              </div>
+              <div className="menu__confirm">
+                <div className="menu__confirm-wrap">
+                  <span>Generated the CSV file.</span>
+                  <div className="menu__confirm-buttons">
+                    <CSVLink onClick={this.exportCSV} data={this.state.jsonDB} filename={"data.csv"} className="btn">Download</CSVLink>
+                  </div>
+                </div>
+              </div>
+            </div>
+          : 
+            <div className="menu__export-csv">
+              <div className="menu__button-wrap">
+                <button className="btn" onClick={this.prepareExport}>Generate CSV</button>
+              </div>
+            </div>
+          }
+
           <div className="menu__alerts">
             <div className="menu__alert-wrap">
               {this.state.alert}
             </div>
           </div>
         </div>
-    	</div>
+      </div>
     );
   }
 }

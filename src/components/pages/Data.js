@@ -74,8 +74,16 @@ class Data extends Component {
 	    <div className="page page__data">
         	<PageTitle title="Data"/>
         	<div className="page-content">
-            <div className="page__data-table">
-              {this.state.isFetching ? <p>Chwilka...</p> : this.loadTable()}
+            <div className="data__table">
+
+              {this.state.isFetching ? 
+                <div className="data__table-loading">
+                  <span>Loading data...</span>
+                </div>
+              : 
+                this.loadTable()
+              }
+
             </div>
 
             <button className="btn" onClick={() => this.handleAddRecipe('Hot Pot')}>Add test data to DB</button>
