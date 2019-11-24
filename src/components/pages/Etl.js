@@ -3,14 +3,31 @@ import PageTitle from './partials/PageTitle.js'
 import fetchJsonp from 'fetch-jsonp'
 import { htmlParser } from '../../Helpers.js';
 
+const RECIPES_URL = 'https://www.skinnytaste.com/recipes/vegetarian'
+const PHASE_E = 'Extracting'
+const PHASE_T = 'Transforming'
+const PHASE_L = 'Loading'
+
 class Etl extends Component {
+
+  fetchController = new AbortController()
 
   constructor(props) {
     super(props)
 
     this.state = {
       recipes: [],
-      checker: ''
+      checkerE: '',
+      checkerT: '',
+      checkerL: '',
+      inFullProcess: false,
+      inStepsProcess: false,
+      startedE: false,
+      startedT: false,
+      startedL: false,
+      finishedE: false,
+      finishedT: false,
+      finishedL: false,
     }
 
     this.fullProcess = this.fullProcess.bind(this)
@@ -22,107 +39,174 @@ class Etl extends Component {
     this.processRecipes = this.processRecipes.bind(this)
     this.fetchRecipe = this.fetchRecipe.bind(this)
 
+    this.processDetails = this.processDetails.bind(this)
+    this.getRecipeDetails = this.getRecipeDetails.bind(this)
+
+    this.finishPhaseE = this.finishPhaseE.bind(this)
+    this.finishPhaseT = this.finishPhaseT.bind(this)
+    this.finishPhaseL = this.finishPhaseL.bind(this)
   }
 
+  componentDidMount() {
+    this.mounted = true;
+  }
+
+  componentWillUnmount() {
+    this.fetchController.abort()
+    this.mounted = false;
+  }
+
+  /* 
+   *  Full ETL process
+   */
   fullProcess() {
-    this.setState({checker: 'Processing in progress...'})
+
+    if (this.mounted) {
+      this.setState({
+        inFullProcess: true,
+        startedE: true,
+        checkerE: 'Extracting in progress...'
+      })
+    }
 
     this.getPages()
-    .then((response) => this.processPages(response) )
-    .then((response) => this.processRecipes(response) )
-    .then((response) => {
-      this.setState({
-        checker: 'Processing finished. Found '+ response.length +' recipes. ',
-        recipes: response
-      }, function() {
-        console.log(this.state.recipes)
-      })
-    }).catch((error) => {
+    .then((response) => this.processPages(response))
+    .then((response) => this.processRecipes(response))
+    .then((response) => this.finishPhaseE(response))
+    .then((response) => this.processDetails(response))
+
+    .catch((error) => {
       console.log(error)
     })
   }
 
-  /*fullProcess() {
-    this.setState({checker: 'Processing in progress...'})
+  /* 
+   *  End of E Phase
+   */
+  finishPhaseE(data) {
+    if (this.mounted) {
+      this.setState({
+        recipes: data,
+        checkerE: '',
+        finishedE: true,
+      })
+    }
+  }
 
-    this.getPages().then((response) => {
-      if (response.pages) {
-        this.processPages(response.pages).then((urls) => {
-          this.processRecipes(urls).then((data) => {
-            this.setState({
-              checker: 'Processing finished. Found '+ data.length +' recipes. ',
-              recipes: data
-            }, function() {
-              console.log(this.state.recipes)
-            })
+  /* 
+   *  End of T Phase
+   */
+  finishPhaseT(data) {
+    if (this.mounted) {
+      this.setState({
+        checkerT: '',
+        finishedT: true,
+      })
+    }
+  }
 
-            // Tutaj funkcja do wyciagniecia danych bo nie bedzie promisem chyba
+  /* 
+   *  End of L Phase
+   */
+  finishPhaseL(data) {
+    if (this.mounted) {
+      this.setState({
+        checkerL: '',
+        finishedL: true,
+      })
+    }
+  }
 
-            // A potem do zapisania do bazy, byc moze promise?
-          })
-        })
-      } else {
-        console.log(response.error)
-      }
-    }).catch((error) => {
-      console.log(error)
-    })
-  }*/
-
+  /* 
+   *  Get amount of pages 
+   */
   getPages() {
-    return new Promise((resolve, refuse) => {
 
-      fetchJsonp('http://www.whateverorigin.org/get?url=' + encodeURIComponent('https://www.skinnytaste.com/recipes/vegetarian'))
+    return new Promise((resolve, refuse) => {
+      // Fetch recipes from first page
+      fetchJsonp('http://www.whateverorigin.org/get?url=' + encodeURIComponent(RECIPES_URL),
+        {signal: this.fetchController.signal})
       .then((response) => {return response.json()})
       .then((json) => {
 
+        // Json data into HTML
         let recipesHTML = htmlParser.parseFromString(json.contents, "text/html")
         let recipesContent = recipesHTML.getElementById('content')
+
+        // Get amount of available pages of recipes
         let recipesLastPage = recipesContent.querySelector('.nav-links .dots').nextElementSibling.innerHTML
 
+        // If we found the amount all is ok and resolve
+        // If we didn't find the amount display information
         if (recipesLastPage) resolve(recipesLastPage)
-        else refuse()
-
+        else {
+          if (this.mounted) {
+            this.setState({checkerE: 'Failed to get amount of recipes pages.'})
+          }
+          refuse()
+        }
       }).catch((error) => {
-        console.log('Fetch in getPages failed. ' + error)
+        if (this.mounted) {
+          this.setState({checkerE: 'Failed to get amount of recipes pages.'})
+          console.log('Fetch in getPages failed. ' + error)
+        }
         refuse()
       })
     })
   }
 
+  /* 
+   *  Get single page HTML
+   */
   fetchPage(page) {
-    return new Promise((good, bad) => {
-      fetchJsonp('http://www.whateverorigin.org/get?url=' + encodeURIComponent('https://www.skinnytaste.com/recipes/vegetarian/page/' + page))
+
+    return new Promise((resolve, refuse) => {
+      fetchJsonp('http://www.whateverorigin.org/get?url=' + encodeURIComponent(RECIPES_URL + '/page/' + page), 
+        {signal: this.fetchController.signal})
       .then((response) => {return response.json()})
       .then((json) => {
 
+        // Json data into HTML
         let recipesHTML = htmlParser.parseFromString(json.contents, "text/html")
         let recipesContent = recipesHTML.getElementById('content')
+
+        // Get children on recipes container - each is a single recipe
         let recipesArchives = recipesContent.getElementsByClassName('archives')[0].children
         let recipesURLs = []
 
+        // For each recipe, get URL to said recipe an add to array
         for (var i = 1; i < recipesArchives.length - 1; i++) {
           let recipeURL = recipesArchives[i].querySelector('.archive-post > a').href
           recipesURLs.push(recipeURL)
         }
 
-        if (recipesURLs.length) good({data: recipesURLs})
-        else good({error: 'Recipes URLs of page ' + page + ' did not load into the array.'})
+        // If array isn't empty - resolve with data: URLs array
+        if (recipesURLs.length) resolve({data: recipesURLs})
+
+        // If array is empty - resolve with error, so the loop doesn't break
+        else resolve({error: 'Recipes URLs of page ' + page + ' did not load into the array.'})
 
       }).catch((error) => {
-        console.log('Fetch in downloadRecipesHTML on page ' + page + ' failed. ' + error)
-        bad()
+        if (this.mounted) {
+          this.setState({checkerE: 'Failed to get data from page ' + page + '.'})
+          console.log('Fetch in downloadRecipesHTML on page ' + page + ' failed. ' + error)
+        }
+        refuse()
       })
     })
   }
 
-
+  /* 
+   *  Get single recipe HTML
+   */
   fetchRecipe(recipeURL) {
     return new Promise((resolve, reject) => {
-      fetchJsonp('http://www.whateverorigin.org/get?url=' + encodeURIComponent(recipeURL))
+      fetchJsonp('http://www.whateverorigin.org/get?url=' + encodeURIComponent(recipeURL), 
+        {signal: this.fetchController.signal})
       .then((response) => {return response.json()})
       .then((json) => {
 
+        // Json data into HTML
         let recipeHTML = htmlParser.parseFromString(json.contents, "text/html")
         let recipeContainer = recipeHTML.getElementsByClassName('wprm-recipe-container')[0].innerHTML
 
@@ -131,62 +215,154 @@ class Etl extends Component {
           // you'll get data from container in the next step
           resolve({data: recipeContainer})
         } else {
-          resolve({error: 'Cannot find recipe container'})
+          resolve({error: 'Cannot find recipe container at ' + recipeURL})
         }
 
       }).catch((error) => {
-        console.log(error)
+        if (this.mounted) {
+          this.setState({checkerE: 'Failed to get data from URL: ' + recipeURL})
+          console.log('Failed to get data from URL: '+ recipeURL + ' Error: '+ error)
+        }
         reject()
       })
     })
   }
 
-
+  /* 
+   *  Get all recipes data
+   */
   async processRecipes(array) {
     let recipes = []
     let i = 0
     for (const item of array) {
       i++
-      this.setState({checker: 'Procesing recipe ' + i + '...'})
+      if (this.mounted) {
+        this.setState({checkerE: 'Procesing recipe ' + i + '...'})
+      }
       await this.fetchRecipe(item).then((response) => {
+
+        // If recipe returned data, add it to recipes array
         if (response.data) recipes.push(response.data)
+
+        // If recipe returned error, log it in console
         else console.log(response.error)
       })
     }
     return recipes
   }
 
-
+  /* 
+   *  Get URLs from all pages
+   */
   async processPages(pages) {
     let allURLs = []
-    // "pages" instead of number
+    // Final product - "pages" instead of number in the middle !!!
     for (let i = 1; i < 2; i++) {
-      this.setState({checker: 'Procesing page ' + i + '...'})
+      if (this.mounted) {
+        this.setState({checkerE: 'Procesing page ' + i + '...'})
+      }
       await this.fetchPage(i).then((response) => {
+
+        // If page returned data, add it to recipes URLs array
         if (response.data) allURLs.push.apply(allURLs, response.data)
+
+        // If page returned error, log it in console
         else console.log(response.error)
       })
     }
     return allURLs
   }
 
+  getRecipeDetails() {
+    // For one recipe
+  }
 
+  processDetails() {
+    // Start T
+
+    if (this.mounted) {
+      this.setState({
+        startedT: true,
+        checkerT: 'Transformation in progress...'
+      })
+    }
+
+    // Loop for all recipes
+  }
+
+
+  /* 
+   *  RENDER
+   */
   render() {
     return (
 	    <div className="page page__etl">
       	<PageTitle title="Etl"/>
       	<div className="page-content">
           
-          <div className="etl__home-buttons">
-            <div className="etl__home-buttons__wrap">
-        		  <button onClick={this.fullProcess} className="btn">Full ETL Process</button>
+          {!this.state.inFullProcess ? 
+            <div className="etl__buttons">
+              <div className="etl__buttons__wrap">
+          		  <button onClick={this.fullProcess} className="btn">Full ETL Process</button>
+              </div>
+              <div className="etl__buttons__wrap">
+          		  <button disabled className="btn">ETL Step by step</button>
+              </div>
             </div>
-            <div className="etl__home-buttons__wrap">
-        		  <button disabled className="btn">ETL Step by step</button>
-            </div>
-            <p>{this.state.checker}</p>
-          </div>
+          : 
+            <div className="etl__process">
 
+              {this.state.startedE ? 
+                <div className="etl__process_phase">
+                  <div className="etl__process_phase-title">
+                    <span>{PHASE_E}</span> 
+                  </div>
+                  <div className="etl__process_info">
+                    <div className="etl__process_in-progress">
+                      {this.state.checkerE}
+                    </div>
+
+                    {this.state.finishedE ? 
+                      <div className="etl__process_finished">
+                        <div className="etl__process_finished-alert">
+                          Processing has finished.
+                        </div> 
+                        <div className="etl__process_finished-details">
+                          Found <strong>{this.state.recipes.length}</strong> records.
+                        </div>
+                      </div>
+                    : '' }
+
+                  </div>
+                </div>
+              : '' }
+
+              {this.state.startedT ? 
+                <div className="etl__process_phase">
+                  <div className="etl__process_phase-title">
+                    <span>{PHASE_T}</span> 
+                  </div>
+                  <div className="etl__process_info">
+                    <div className="etl__process_in-progress">
+                      {this.state.checkerT}
+                    </div>
+
+                    {this.state.finishedT ? 
+                      <div className="etl__process_finished">
+                        <div className="etl__process_finished-alert">
+                          Alert after T.
+                        </div> 
+                        <div className="etl__process_finished-details">
+                          Details after T.
+                        </div>
+                      </div>
+                    : '' }
+
+                  </div>
+                </div>
+              : '' }
+            </div>
+          }
       	</div>
     	</div>
     );

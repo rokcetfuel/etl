@@ -13,71 +13,67 @@ class Menu extends Component {
       alert: '',
       jsonDB: '',
       jsonReady: false,
-      confirm: false
+      resetReady: false
     }
   
-    this.prepareExport = this.prepareExport.bind(this)
-    this.exportCSV = this.exportCSV.bind(this)
-
+    this.startExport = this.startExport.bind(this)
+    this.doExport = this.doExport.bind(this)
     this.startReset = this.startReset.bind(this)
     this.doReset = this.doReset.bind(this)
-    this.stopReset = this.stopReset.bind(this)
+    this.comeBack = this.comeBack.bind(this)
   }
 
-  startReset() {
+  comeBack() {
     this.setState({
-      confirm: true,
+      resetReady: false,
       alert: '',
       jsonReady: false
     })
   }
 
-  stopReset() {
+  startReset() {
     this.setState({
-      confirm: false,
-      alert: ''
+      resetReady: true,
+      alert: '',
+      jsonReady: false
     })
   }
 
   doReset() {
-    db.recipes.clear()
+    db.delete()
+    .then(() => db.open())
     .then(() => {
       this.setState({
         alert: 'Database has been reset.',
-        confirm: false
+        resetReady: false
       });
     }).catch((err) => {
       this.setState({
         alert: 'Problem with the database reset. Try again.',
-        confirm: false
+        resetReady: false
       });
     });
   }
 
-  prepareExport() {
-
-    this.setState({
-      confirm: false
-    })
+  startExport() {
+    this.setState({resetReady: false})
 
     db.recipes.toArray().then((jsonDB) => {
-      let newArray = [];
+      let flatDBArray = [];
 
       jsonDB.forEach((record) => {
         let newRecord = flatten(record);
-        newArray.push(newRecord);
+        flatDBArray.push(newRecord);
       });
 
-      console.log(newArray)
-
       this.setState({
-        jsonDB: newArray,
+        jsonDB: flatDBArray,
         jsonReady: true
       })
     });
   }
 
-  exportCSV() {
+  doExport() {
     this.setState({
       alert: '',
       jsonReady: false
@@ -90,7 +86,7 @@ class Menu extends Component {
         <PageTitle title="Menu"/>
         <div className="page-content">
 
-          {this.state.confirm ?
+          {this.state.resetReady ?
             <div className="menu__reset-db">
               <div className="menu__button-wrap">
                 <button className="btn" disabled>Reset database</button>
@@ -100,7 +96,7 @@ class Menu extends Component {
                   <span>Are you sure?</span>
                   <div className="menu__confirm-buttons">
                     <button className="btn" onClick={this.doReset}>Yes</button>
-                    <button className="btn" onClick={this.stopReset}>No</button>
+                    <button className="btn" onClick={this.comeBack}>No</button>
                   </div>
                 </div>
               </div>
@@ -120,9 +116,10 @@ class Menu extends Component {
               </div>
               <div className="menu__confirm">
                 <div className="menu__confirm-wrap">
-                  <span>Generated the CSV file.</span>
+                  <span>Generated the CSV file. Download?</span>
                   <div className="menu__confirm-buttons">
-                    <CSVLink onClick={this.exportCSV} data={this.state.jsonDB} filename={"data.csv"} className="btn">Download</CSVLink>
+                    <CSVLink onClick={this.doExport} data={this.state.jsonDB} filename={"data.csv"} className="btn">Yes</CSVLink>
+                    <button className="btn" onClick={this.comeBack}>No</button>
                   </div>
                 </div>
               </div>
@@ -130,7 +127,7 @@ class Menu extends Component {
           : 
             <div className="menu__export-csv">
               <div className="menu__button-wrap">
-                <button className="btn" onClick={this.prepareExport}>Generate CSV</button>
+                <button className="btn" onClick={this.startExport}>Generate CSV</button>
               </div>
             </div>
           }
