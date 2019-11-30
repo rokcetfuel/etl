@@ -17,6 +17,7 @@ class Etl extends Component {
     super(props)
 
     this.state = {
+      recipesInDb: [],
       recipes: [],
       checkerE: '',
       checkerT: '',
@@ -43,6 +44,7 @@ class Etl extends Component {
     this.processDetails = this.processDetails.bind(this)
     this.getRecipeDetails = this.getRecipeDetails.bind(this)
 
+    this.startSaving = this.startSaving.bind(this)
     this.processSaving = this.processSaving.bind(this)
     this.checkBeforeSave = this.checkBeforeSave.bind(this)
 
@@ -79,8 +81,9 @@ class Etl extends Component {
     .then((response) => this.finishPhaseE(response))
     .then((response) => this.processDetails(response))
     .then((response) => this.finishPhaseT(response))
+    .then((response) => this.startSaving(response))
     .then((response) => this.processSaving(response))
-
+    .then((response) => this.finishPhaseL(response))
     .catch((error) => {
       console.log(error)
     })
@@ -104,7 +107,6 @@ class Etl extends Component {
    */
   finishPhaseT(data) {
     if (this.mounted) {
-
       if (!this.state.error) {
         this.setState({
           recipes: data,
@@ -127,8 +129,12 @@ class Etl extends Component {
       this.setState({
         checkerL: '',
         finishedL: true,
+        newRecipes: data.newRecipes,
+        updatedRecipes: data.updatedRecipes
       })
     }
+
+    // Add link to table and info that the page will reset
   }
 
   /* 
@@ -189,8 +195,8 @@ class Etl extends Component {
         let recipesURLs = []
 
         // For each recipe, get URL to said recipe an add to array
-        for (var i = 1; i < recipesArchives.length - 1; i++) {
-        //for (var i = 1; i < 10; i++) {
+        //for (var i = 1; i < recipesArchives.length - 1; i++) {
+        for (var i = 1; i < 10; i++) {
           let recipeURL = recipesArchives[i].querySelector('.archive-post > a').href
           recipesURLs.push(recipeURL)
         }
@@ -252,7 +258,7 @@ class Etl extends Component {
     for (const item of array) {
       i++
       if (this.mounted) {
-        this.setState({checkerE: 'Procesing recipe ' + i + '...'})
+        this.setState({checkerE: 'Extracting recipe ' + i + '...'})
       }
       await this.fetchRecipe(item).then((response) => {
 
@@ -274,7 +280,7 @@ class Etl extends Component {
     // Final product - "pages" instead of number in the middle !!!
     for (let i = 1; i < 2; i++) {
       if (this.mounted) {
-        this.setState({checkerE: 'Procesing page ' + i + '...'})
+        this.setState({checkerE: 'Extracting page ' + i + '...'})
       }
       await this.fetchPage(i).then((response) => {
 
@@ -311,6 +317,7 @@ class Etl extends Component {
 
             if (elText) {
               elText = elText.innerHTML
+              elText = decodeHtml(elText)
 
               // If variable type is numeric or float, parse it
               if (keys[i].dataType === 'num') {
@@ -328,10 +335,8 @@ class Etl extends Component {
               }
             }
 
-            
-
             // Add to this recipe array
-            recipe[elKey] = decodeHtml(elText)
+            recipe[elKey] = elText
           } 
 
           // If key type is time, count hours and minutes
@@ -407,58 +412,89 @@ class Etl extends Component {
   /* 
    *  Add, update or delete recipe in database
    */
-  checkBeforeSave(recipe) {
+  checkBeforeSave(recipe, dbRecipesIDs) {
+    return new Promise((resolve, refuse) => {
+      let recipeExists = false
+      let existingID = ''
+
+      for (let recipeID of dbRecipesIDs) {
+        if (recipe.recipe_id === recipeID) {
+          recipeExists = true
+          existingID = recipeID
+        } 
+      }
+
+      if (recipeExists) {
+        db.table('recipes').get({recipe_id: existingID})
+        .then((response) => {
+          let recordId = response.id
+          db.table('recipes').update(recordId, recipe)
+          .then(() => resolve({new: false}))
+          .catch((error) => refuse(error))
+        })
+        .catch((error) => refuse(error))
+      } else {
+        db.table('recipes').add(recipe)
+        .then(() => resolve({new: true}))
+        .catch((error) => refuse(error))
+      }
+    })
+  }
+
+  /* 
+   *  Get recipes from database to check
+   */
+  startSaving() {
 
     return new Promise((resolve, refuse) => {
-
-      db.table('recipes').add(recipe)
-      .then(() => {
-        console.log('Added.')
-        resolve()
-      })
-      .catch((error) => {
-        console.log(error)
-        refuse()
-      })
+      if (this.mounted) {
+        db.table('recipes').toArray()
+        .then((recipes) => {
+          this.setState({
+            recipesInDb: recipes,
+            startedL: true,
+            checkerL: 'Loading records to database...'
+          }, () => {
+            resolve()
+          })
+        }).catch((error) => refuse(error))
+      }
     })
-
   }
 
   /* 
    *  Save recipes to database
    */
   async processSaving() {
-    if (this.mounted) {
-      this.setState({
-        startedL: true,
-        checkerL: 'Loading records to database...'
-      })
-    }
 
-    let recipes = this.state.recipes
-    let i = 0
+    let newRecipes = this.state.recipes
+    let dbRecipes = this.state.recipesInDb
+    let dbRecipesIDs = []
+    let newRecipeCount = 0
+    let updatedRecipeCount = 0
 
-    // Each recipe:
-    // Check ID
-    // -- if it doesn't exist, save it, no problem
-    // -- if it exists:
-    // ---- update everything except ID
-    // At the end: New __, Updated __, Deleted __
+    for (let recipe of dbRecipes) {
+      dbRecipesIDs.push(recipe.recipe_id)
+    }    
 
-    for (let recipe of recipes) {
-      i++
-
+    for (let recipe of newRecipes) {
       if (this.mounted) {
-        this.setState({checkerL: 'Checking recipe ' + i + '...'})
+        await this.checkBeforeSave(recipe, dbRecipesIDs).then((response) => {
+          if (response.new) {
+            newRecipeCount++
+          } else {
+            updatedRecipeCount++
+          }
+        })
       }
-
-      await this.checkBeforeSave(recipe).then((response) => {
-
-
-      })
     }
 
+    return {newRecipes: newRecipeCount, updatedRecipes: updatedRecipeCount}
 
+    // Na koniec:
+    // Check if the number of recipes is correct - updated + added
+    // If there's more in the database, find those that don't have their ID
+    // and delete them. 
   }
 
 
@@ -470,7 +506,7 @@ class Etl extends Component {
 	    <div className="page page__etl">
       	<PageTitle title="Etl"/>
       	<div className="page-content">
-          
+
           {!this.state.inFullProcess ? 
             <div className="etl__buttons">
               <div className="etl__buttons__wrap">
@@ -546,10 +582,11 @@ class Etl extends Component {
                     {this.state.finishedL ? 
                       <div className="etl__process_finished">
                         <div className="etl__process_finished-alert">
-                          Alert L.
+                          Finished loading data into the database.
                         </div> 
                         <div className="etl__process_finished-details">
-                          Details L.
+                          Added <strong>{this.state.newRecipes}</strong> new recipes. <br/> 
+                          Updated <strong>{this.state.updatedRecipes}</strong> new recipes.
                         </div>
                       </div>
                     : '' }
@@ -559,6 +596,7 @@ class Etl extends Component {
               : '' }
             </div>
           }
+
       	</div>
     	</div>
     )

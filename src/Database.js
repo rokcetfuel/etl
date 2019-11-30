@@ -2,7 +2,7 @@ import Dexie from 'dexie';
 
 const db = new Dexie('RecipesDB');
 db.version(1).stores({
-  recipes: '++id'
+  recipes: '++id, recipe_id'
 });
 export default db
 
