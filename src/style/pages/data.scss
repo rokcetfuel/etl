@@ -8,7 +8,8 @@
 		line-height: 1.4;
 	}
 
-	.MuiTableCell-head {
+	.MuiTableCell-head,
+	.MuiTableCell-root {
 		white-space: nowrap;
 	}
 }
@@ -21,9 +22,9 @@
 	& > span {
 		display: inline-block;
 		background-image: linear-gradient(to right, black, black);
-  	background-position: 0 1.1em;
-  	background-repeat: repeat-x;
-  	background-size: 10px 2px;
-  	padding-bottom:4px;
+	  	background-position: 0 1.1em;
+	  	background-repeat: repeat-x;
+	  	background-size: 10px 2px;
+	  	padding-bottom:4px;
 	}
 }

@@ -1,7 +1,8 @@
 import React, {Component} from 'react'
 import PageTitle from './partials/PageTitle.js'
 import fetchJsonp from 'fetch-jsonp'
-import { htmlParser } from '../../Helpers.js';
+import { htmlParser, decodeHtml } from '../../Helpers.js'
+import db, { keys, TIME_SELECTOR_M, TIME_SELECTOR_H } from '../../Database.js'
 
 const RECIPES_URL = 'https://www.skinnytaste.com/recipes/vegetarian'
 const PHASE_E = 'Extracting'
@@ -42,18 +43,21 @@ class Etl extends Component {
     this.processDetails = this.processDetails.bind(this)
     this.getRecipeDetails = this.getRecipeDetails.bind(this)
 
+    this.processSaving = this.processSaving.bind(this)
+    this.checkBeforeSave = this.checkBeforeSave.bind(this)
+
     this.finishPhaseE = this.finishPhaseE.bind(this)
     this.finishPhaseT = this.finishPhaseT.bind(this)
     this.finishPhaseL = this.finishPhaseL.bind(this)
   }
 
   componentDidMount() {
-    this.mounted = true;
+    this.mounted = true
   }
 
   componentWillUnmount() {
     this.fetchController.abort()
-    this.mounted = false;
+    this.mounted = false
   }
 
   /* 
@@ -74,6 +78,8 @@ class Etl extends Component {
     .then((response) => this.processRecipes(response))
     .then((response) => this.finishPhaseE(response))
     .then((response) => this.processDetails(response))
+    .then((response) => this.finishPhaseT(response))
+    .then((response) => this.processSaving(response))
 
     .catch((error) => {
       console.log(error)
@@ -88,7 +94,7 @@ class Etl extends Component {
       this.setState({
         recipes: data,
         checkerE: '',
-        finishedE: true,
+        finishedE: true
       })
     }
   }
@@ -98,10 +104,18 @@ class Etl extends Component {
    */
   finishPhaseT(data) {
     if (this.mounted) {
-      this.setState({
-        checkerT: '',
-        finishedT: true,
-      })
+
+      if (!this.state.error) {
+        this.setState({
+          recipes: data,
+          checkerT: '',
+          finishedT: true
+        })
+      } else {
+        this.setState({
+          checkerT: 'Transformation failed - did not receive recipes data. Restart the process.'
+        })
+      }
     }
   }
 
@@ -176,6 +190,7 @@ class Etl extends Component {
 
         // For each recipe, get URL to said recipe an add to array
         for (var i = 1; i < recipesArchives.length - 1; i++) {
+        //for (var i = 1; i < 10; i++) {
           let recipeURL = recipesArchives[i].querySelector('.archive-post > a').href
           recipesURLs.push(recipeURL)
         }
@@ -200,7 +215,7 @@ class Etl extends Component {
    *  Get single recipe HTML
    */
   fetchRecipe(recipeURL) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, refuse) => {
       fetchJsonp('http://www.whateverorigin.org/get?url=' + encodeURIComponent(recipeURL), 
         {signal: this.fetchController.signal})
       .then((response) => {return response.json()})
@@ -208,7 +223,7 @@ class Etl extends Component {
 
         // Json data into HTML
         let recipeHTML = htmlParser.parseFromString(json.contents, "text/html")
-        let recipeContainer = recipeHTML.getElementsByClassName('wprm-recipe-container')[0].innerHTML
+        let recipeContainer = recipeHTML.getElementsByClassName('wprm-recipe-container')[0].outerHTML
 
         if (recipeContainer) {
           // Answers with recipe container, 
@@ -223,7 +238,7 @@ class Etl extends Component {
           this.setState({checkerE: 'Failed to get data from URL: ' + recipeURL})
           console.log('Failed to get data from URL: '+ recipeURL + ' Error: '+ error)
         }
-        reject()
+        refuse()
       })
     })
   }
@@ -273,13 +288,94 @@ class Etl extends Component {
     return allURLs
   }
 
-  getRecipeDetails() {
-    // For one recipe
+  /* 
+   *  Get data from recipe HTML into an array
+   */
+  getRecipeDetails(recipeCode) {
+    let recipe = {}
+    let recipeHtml = htmlParser.parseFromString(recipeCode, "text/html")
+
+    // If no problem with keys
+    if (keys.length > 0) {
+
+      // For each variable of this recipe
+      for (let i = 0; i < keys.length; i++) {
+
+        // Database record ID has no selector
+        if (keys[i].selector) {
+
+          // If key type is class just take whatever's in the element with said class
+          if (keys[i].selectorType === 'class') {
+            let elText = recipeHtml.getElementsByClassName(keys[i].selector)[0]
+            let elKey = keys[i].field
+
+            if (elText) {
+              elText = elText.innerHTML
+
+              // If variable type is numeric or float, parse it
+              if (keys[i].dataType === 'num') {
+                elText = parseInt(elText)
+              } else if (keys[i].dataType === 'float') {
+                elText = parseFloat(elText)
+              }
+            } else {
+              if (keys[i].dataType === 'num') {
+                elText = 0
+              } else if (keys[i].dataType === 'float') {
+                elText = 0
+              } else {
+                elText = ''
+              }
+            }
+
+            
+
+            // Add to this recipe array
+            recipe[elKey] = decodeHtml(elText)
+          } 
+
+          // If key type is time, count hours and minutes
+          else if (keys[i].selectorType === 'time') {
+            let el = recipeHtml.getElementsByClassName(keys[i].selector)[0]
+            let elKey = keys[i].field
+
+            if (el) {
+              let hrContainer = el.getElementsByClassName(TIME_SELECTOR_H)[0]
+              let minContainer = el.getElementsByClassName(TIME_SELECTOR_M)[0]
+              let hr = 0
+              let min = 0
+
+              // Convert hours into minutes
+              if (hrContainer) hr = hrContainer.innerHTML * 60
+              if (minContainer) min = minContainer.innerHTML
+              let totalTime = parseInt(hr) + parseInt(min)
+
+              recipe[elKey] = totalTime
+            } else {
+              let totalTime = 0
+              recipe[elKey] = totalTime
+            }
+          }
+
+          // If key type is data, we take data from class element
+          else if (keys[i].selectorType === 'data') {
+            let el = recipeHtml.getElementsByClassName(keys[i].selector)[0]
+            let elData = el.dataset.recipeId
+            let elKey = keys[i].field
+            recipe[elKey] = elData
+          }
+        }
+      }
+    }
+
+    // When all keys handled, return the array
+    return recipe
   }
 
+  /* 
+   *  Get data from recipes HTML into array of arrays
+   */
   processDetails() {
-    // Start T
-
     if (this.mounted) {
       this.setState({
         startedT: true,
@@ -287,7 +383,82 @@ class Etl extends Component {
       })
     }
 
-    // Loop for all recipes
+    let recipes = this.state.recipes
+    let count = recipes.length
+    let recipesGood = []
+
+    // If recipes in state are ok
+    if ((count > 0) && this.mounted) {
+      for (let i = 0; i < count; i++) {
+
+        // trasform each recipeHTML into data in array
+        let recipeHtml = recipes[i]
+        let recipeGood = this.getRecipeDetails(recipeHtml)
+        if (recipeGood) recipesGood.push(recipeGood)
+      }
+    } else {
+      this.setState({
+        error: true
+      })
+    }
+    return recipesGood
+  }
+
+  /* 
+   *  Add, update or delete recipe in database
+   */
+  checkBeforeSave(recipe) {
+
+    return new Promise((resolve, refuse) => {
+
+      db.table('recipes').add(recipe)
+      .then(() => {
+        console.log('Added.')
+        resolve()
+      })
+      .catch((error) => {
+        console.log(error)
+        refuse()
+      })
+    })
+
+  }
+
+  /* 
+   *  Save recipes to database
+   */
+  async processSaving() {
+    if (this.mounted) {
+      this.setState({
+        startedL: true,
+        checkerL: 'Loading records to database...'
+      })
+    }
+
+    let recipes = this.state.recipes
+    let i = 0
+
+    // Each recipe:
+    // Check ID
+    // -- if it doesn't exist, save it, no problem
+    // -- if it exists:
+    // ---- update everything except ID
+    // At the end: New __, Updated __, Deleted __
+
+    for (let recipe of recipes) {
+      i++
+
+      if (this.mounted) {
+        this.setState({checkerL: 'Checking recipe ' + i + '...'})
+      }
+
+      await this.checkBeforeSave(recipe).then((response) => {
+
+
+      })
+    }
+
+
   }
 
 
@@ -350,10 +521,35 @@ class Etl extends Component {
                     {this.state.finishedT ? 
                       <div className="etl__process_finished">
                         <div className="etl__process_finished-alert">
-                          Alert after T.
+                          Transformation finished.
                         </div> 
                         <div className="etl__process_finished-details">
-                          Details after T.
+                          Transformed <strong>{this.state.recipes.length}</strong> records.
+                        </div>
+                      </div>
+                    : '' }
+
+                  </div>
+                </div>
+              : '' }
+
+              {this.state.startedL ? 
+                <div className="etl__process_phase">
+                  <div className="etl__process_phase-title">
+                    <span>{PHASE_L}</span> 
+                  </div>
+                  <div className="etl__process_info">
+                    <div className="etl__process_in-progress">
+                      {this.state.checkerL}
+                    </div>
+
+                    {this.state.finishedL ? 
+                      <div className="etl__process_finished">
+                        <div className="etl__process_finished-alert">
+                          Alert L.
+                        </div> 
+                        <div className="etl__process_finished-details">
+                          Details L.
                         </div>
                       </div>
                     : '' }
@@ -365,8 +561,8 @@ class Etl extends Component {
           }
       	</div>
     	</div>
-    );
+    )
   }
 }
 
-export default Etl;
+export default Etl

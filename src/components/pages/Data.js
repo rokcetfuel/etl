@@ -2,7 +2,6 @@ import React, {Component} from 'react'
 import PageTitle from './partials/PageTitle.js'
 import MaterialTable from "material-table";
 import db, { keys } from '../../Database.js';
-import { flatten } from '../../Helpers.js';
 
 class Data extends Component {
 
@@ -15,18 +14,12 @@ class Data extends Component {
       tableData: []
     }
 
-    this.handleAddRecipe = this.handleAddRecipe.bind(this)
     this.loadTable = this.loadTable.bind(this)
   }
 
   componentDidMount() {
     db.table('recipes').toArray().then((recipes) => {
-      let flatRecipes = []
-      recipes.forEach((record) => {
-        let flatRecord = flatten(record)
-        flatRecipes.push(flatRecord)
-      })
-      flatRecipes = JSON.stringify(flatRecipes)
+      let flatRecipes = JSON.stringify(recipes)
       this.setState({
         tableData: flatRecipes,
         isFetching: false
@@ -34,30 +27,13 @@ class Data extends Component {
     })
   }
 
-  handleAddRecipe(recipeTitle) {
-    let recipe = {
-      title: recipeTitle,
-      recipe_id: 2,
-      cuisine: 'Chinese',
-      time: {
-        cook: 5,
-        prepare: 5,
-        all: 10
-      }
-    }
-    db.table('recipes').add(recipe).then((id) => {
-      console.log('Added.')
-    })
-  }
-
   loadTable() {
-
     let tableData = JSON.parse(this.state.tableData)
     return (
       <MaterialTable 
         options = {{
-          pageSize: 25,
-          pageSizeOptions: [25, 50, 100],
+          pageSize: 20,
+          pageSizeOptions: [20, 40, 60, 80, 100],
           toolbar: false,
           headerStyle: {
             fontWeight: '700'
@@ -85,8 +61,6 @@ class Data extends Component {
               }
 
             </div>
-
-            <button className="btn" onClick={() => this.handleAddRecipe('Hot Pot')}>Add test data to DB</button>
           </div>
       	</div>
     );
