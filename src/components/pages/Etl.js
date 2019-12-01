@@ -3,6 +3,7 @@ import PageTitle from './partials/PageTitle.js'
 import fetchJsonp from 'fetch-jsonp'
 import { htmlParser, decodeHtml } from '../../Helpers.js'
 import db, { keys, TIME_SELECTOR_M, TIME_SELECTOR_H } from '../../Database.js'
+import {NavLink} from 'react-router-dom'
 
 const RECIPES_URL = 'https://www.skinnytaste.com/recipes/vegetarian'
 const PHASE_E = 'Extracting'
@@ -17,11 +18,27 @@ class Etl extends Component {
     super(props)
 
     this.state = {
+
+      // Old recipes in the database
       recipesInDb: [],
+
+      // New recipes to add and update
       recipes: [],
+
+      // Count recipes 
+      newRecipes: 0,
+      updatedRecipes: 0,
+
+      // Steps variables
+      extractedData: false,
+      transformedData: false,
+
+      // Alerts
       checkerE: '',
       checkerT: '',
       checkerL: '',
+
+      // For rendering
       inFullProcess: false,
       inStepsProcess: false,
       startedE: false,
@@ -30,6 +47,7 @@ class Etl extends Component {
       finishedE: false,
       finishedT: false,
       finishedL: false,
+      error: false,
     }
 
     this.fullProcess = this.fullProcess.bind(this)
@@ -51,15 +69,59 @@ class Etl extends Component {
     this.finishPhaseE = this.finishPhaseE.bind(this)
     this.finishPhaseT = this.finishPhaseT.bind(this)
     this.finishPhaseL = this.finishPhaseL.bind(this)
+
+    this.stepsProcess = this.stepsProcess.bind(this)
+    this.stepE = this.stepE.bind(this)
+    this.stepT = this.stepT.bind(this)
+    this.stepL = this.stepL.bind(this)
+
+    this.resetComponent = this.resetComponent.bind(this)
   }
 
   componentDidMount() {
     this.mounted = true
+    this.resetComponent()
   }
 
   componentWillUnmount() {
     this.fetchController.abort()
     this.mounted = false
+  }
+
+  resetComponent() {
+    if (this.mounted) {
+      this.setState({
+        // Old recipes in the database
+        recipesInDb: [],
+
+        // New recipes to add and update
+        recipes: [],
+
+        // Count recipes 
+        newRecipes: 0,
+        updatedRecipes: 0,
+
+        // Steps variables
+        extractedData: false,
+        transformedData: false,
+
+        // Alerts
+        checkerE: '',
+        checkerT: '',
+        checkerL: '',
+
+        // For rendering
+        inFullProcess: false,
+        inStepsProcess: false,
+        startedE: false,
+        startedT: false,
+        startedL: false,
+        finishedE: false,
+        finishedT: false,
+        finishedL: false,
+        error: false,
+      })
+    }
   }
 
   /* 
@@ -114,9 +176,11 @@ class Etl extends Component {
           finishedT: true
         })
       } else {
-        this.setState({
-          checkerT: 'Transformation failed - did not receive recipes data. Restart the process.'
-        })
+        if (this.mounted) {
+          this.setState({
+            checkerT: 'Transformation failed - did not receive recipes data. Restart the process.'
+          })
+        }
       }
     }
   }
@@ -196,7 +260,7 @@ class Etl extends Component {
 
         // For each recipe, get URL to said recipe an add to array
         //for (var i = 1; i < recipesArchives.length - 1; i++) {
-        for (var i = 1; i < 10; i++) {
+        for (var i = 1; i < 21; i++) {
           let recipeURL = recipesArchives[i].querySelector('.archive-post > a').href
           recipesURLs.push(recipeURL)
         }
@@ -402,9 +466,11 @@ class Etl extends Component {
         if (recipeGood) recipesGood.push(recipeGood)
       }
     } else {
-      this.setState({
-        error: true
-      })
+      if (this.mounted) {
+        this.setState({
+          error: true
+        })
+      }
     }
     return recipesGood
   }
@@ -447,9 +513,9 @@ class Etl extends Component {
   startSaving() {
 
     return new Promise((resolve, refuse) => {
-      if (this.mounted) {
-        db.table('recipes').toArray()
-        .then((recipes) => {
+      db.table('recipes').toArray()
+      .then((recipes) => {
+        if (this.mounted) {
           this.setState({
             recipesInDb: recipes,
             startedL: true,
@@ -457,8 +523,8 @@ class Etl extends Component {
           }, () => {
             resolve()
           })
-        }).catch((error) => refuse(error))
-      }
+        }
+      }).catch((error) => refuse(error))
     })
   }
 
@@ -479,10 +545,12 @@ class Etl extends Component {
 
     for (let recipe of newRecipes) {
       if (this.mounted) {
+        // eslint-disable-next-line
         await this.checkBeforeSave(recipe, dbRecipesIDs).then((response) => {
           if (response.new) {
             newRecipeCount++
           } else {
+
             updatedRecipeCount++
           }
         })
@@ -497,6 +565,112 @@ class Etl extends Component {
     // and delete them. 
   }
 
+  /* 
+   *  Steps ETL process
+   */
+  stepsProcess() {
+
+    if (this.mounted) {
+      this.setState({
+        inStepsProcess: true
+      })
+    }
+  }
+
+  /* 
+   *  Full ETL process
+   */
+  stepE() {
+
+    if (this.mounted) {
+      this.setState({
+        startedE: true,
+        checkerE: 'Extracting in progress...'
+      })
+    }
+
+    this.getPages()
+    .then((response) => this.processPages(response))
+    .then((response) => this.processRecipes(response))
+    .then((response) => this.finishPhaseE(response))
+    .then(() => {
+      if (this.mounted) {
+        this.setState({
+          extractedData: this.state.recipes
+        })
+      }
+    })
+    .catch((error) => {
+      console.log(error)
+    })
+  }
+
+  stepT() {
+
+    let extractedData = this.state.extractedData
+    
+    this.processDetailsSteps(extractedData)
+    .then((response) => this.finishPhaseT(response))
+    .then(() => {
+      if (this.mounted) {
+        this.setState({
+          transformedData: this.state.recipes
+        })
+      }
+    })
+    .catch((error) => {
+      console.log(error)
+    })
+  }
+
+  stepL() {
+    let transformedData = this.state.transformedData
+    this.startSaving(transformedData)
+    .then((response) => this.processSaving(response))
+    .then((response) => this.finishPhaseL(response))
+    .catch((error) => {
+      console.log(error)
+    })
+  }
+
+  /* 
+   *  Get data from recipes HTML into array of arrays
+   */
+  processDetailsSteps(extracted) {
+
+    return new Promise((resolve, refuse) => {
+      if (this.mounted) {
+        this.setState({
+          startedT: true,
+          checkerT: 'Transformation in progress...'
+        })
+      }
+
+      let recipes = extracted
+      let count = recipes.length
+      let recipesGood = []
+
+      // If recipes in state are ok
+      if ((count > 0) && this.mounted) {
+        for (let i = 0; i < count; i++) {
+
+          // trasform each recipeHTML into data in array
+          let recipeHtml = recipes[i]
+          let recipeGood = this.getRecipeDetails(recipeHtml)
+          if (recipeGood) recipesGood.push(recipeGood)
+        }
+      } else {
+        if (this.mounted) {
+          this.setState({
+            error: true
+          })
+        }
+      }
+
+      resolve(recipesGood)
+    })
+  }
+
 
   /* 
    *  RENDER
@@ -507,17 +681,44 @@ class Etl extends Component {
       	<PageTitle title="Etl"/>
       	<div className="page-content">
 
-          {!this.state.inFullProcess ? 
+          { (!this.state.inFullProcess && !this.state.inStepsProcess) ? 
             <div className="etl__buttons">
               <div className="etl__buttons__wrap">
           		  <button onClick={this.fullProcess} className="btn">Full ETL Process</button>
               </div>
               <div className="etl__buttons__wrap">
-          		  <button disabled className="btn">ETL Step by step</button>
+          		  <button onClick={this.stepsProcess} className="btn">ETL Step by step</button>
               </div>
             </div>
           : 
             <div className="etl__process">
+
+              <div className="menu__button-wrap">
+                <button onClick={this.resetComponent} className="btn etl__process_goback">Stop ETL and go back</button>
+              </div>
+
+              {this.state.inStepsProcess ? 
+                <div className="etl__process_phase etl__process_steps">
+                  <div className="etl__process_phase-title">
+                    <span>Choose available step</span> 
+                  </div>
+                  <div className="menu__confirm-buttons">
+
+                    <button 
+                    {...(this.state.extractedData ? {disabled:true} : {})}
+                    onClick={this.stepE} className="btn">E</button>
+
+                    <button 
+                    {...((this.state.extractedData && !this.state.transformedData) ? {} : {disabled:true})}
+                    onClick={this.stepT} className="btn">T</button>
+
+                    <button 
+                    {...((this.state.transformedData && !this.state.finishedL) ? {} :  {disabled:true})}
+                    onClick={this.stepL} className="btn">L</button>
+
+                  </div>
+                </div>
+              : '' }
 
               {this.state.startedE ? 
                 <div className="etl__process_phase">
@@ -532,7 +733,7 @@ class Etl extends Component {
                     {this.state.finishedE ? 
                       <div className="etl__process_finished">
                         <div className="etl__process_finished-alert">
-                          Processing has finished.
+                          Extracting has finished.
                         </div> 
                         <div className="etl__process_finished-details">
                           Found <strong>{this.state.recipes.length}</strong> records.
@@ -557,7 +758,7 @@ class Etl extends Component {
                     {this.state.finishedT ? 
                       <div className="etl__process_finished">
                         <div className="etl__process_finished-alert">
-                          Transformation finished.
+                          Transformation has finished.
                         </div> 
                         <div className="etl__process_finished-details">
                           Transformed <strong>{this.state.recipes.length}</strong> records.
@@ -582,11 +783,16 @@ class Etl extends Component {
                     {this.state.finishedL ? 
                       <div className="etl__process_finished">
                         <div className="etl__process_finished-alert">
-                          Finished loading data into the database.
+                          Loading has finished.
                         </div> 
                         <div className="etl__process_finished-details">
                           Added <strong>{this.state.newRecipes}</strong> new recipes. <br/> 
                           Updated <strong>{this.state.updatedRecipes}</strong> new recipes.
+
+                          <div className="menu__confirm-buttons">
+                            <NavLink className="btn" to="/data">See the Data</NavLink>
+                          </div>
+
                         </div>
                       </div>
                     : '' }

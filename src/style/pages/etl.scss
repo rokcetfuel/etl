@@ -17,6 +17,17 @@
 	border: 2px solid #000;
 	padding: 15px 20px;
 	position: relative;
+
+	.menu__confirm-buttons {
+		margin-top:20px;
+	}
+}
+
+.etl__process_steps {
+	
+	.menu__confirm-buttons {
+		margin-top:0;
+	}
 }
 
 .etl__process_phase-title {
