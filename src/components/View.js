@@ -7,9 +7,6 @@ import Data from './pages/Data.js'
 class View extends Component {
 
   render() {
-
-  	let data = this.props.data
-
     return (
 	    <Switch>
 	      <Route path="/home">
@@ -19,7 +16,7 @@ class View extends Component {
 	        <Menu />
 	      </Route>
 	      <Route path="/data">
-	        <Data data={data}/>
+	        <Data/>
 	      </Route>
 	      <Redirect from="/" to="/home" />
 	    </Switch>

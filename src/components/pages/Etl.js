@@ -3,7 +3,7 @@ import PageTitle from './partials/PageTitle.js'
 import fetchJsonp from 'fetch-jsonp'
 import { htmlParser, decodeHtml } from '../../Helpers.js'
 import db, { keys, TIME_SELECTOR_M, TIME_SELECTOR_H } from '../../Database.js'
-import {NavLink} from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 
 const RECIPES_URL = 'https://www.skinnytaste.com/recipes/vegetarian'
 const PHASE_E = 'Extracting'

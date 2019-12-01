@@ -2,8 +2,6 @@ import React, {Component} from 'react'
 import Navigation from './components/Navigation.js'
 import View from './components/View.js'
 import { HashRouter as Router } from "react-router-dom";
-import db from './Database.js';
-import { flatten } from './Helpers.js';
 
 class App extends Component {
 
@@ -11,21 +9,8 @@ class App extends Component {
     super()
 
     this.state = { 
-      isLoading: true,
-      recipes: []
+      isLoading: true
     }
-
-    db.table('recipes').toArray().then((recipes) => {
-      let flatRecipes = []
-      recipes.forEach((record) => {
-        let flatRecord = flatten(record)
-        flatRecipes.push(flatRecord)
-      })
-      flatRecipes = JSON.stringify(flatRecipes)
-      this.setState({
-        recipes: flatRecipes
-      })
-    })
   }
 
   componentDidMount() {
@@ -38,7 +23,7 @@ class App extends Component {
         <div className="app__container">
           <div className="app__content">
             <Router>
-              <View data={this.state.recipes} />
+              <View/>
               <Navigation/>
             </Router>
           </div>
