@@ -9,10 +9,15 @@ const RECIPES_URL = 'https://www.skinnytaste.com/recipes/vegetarian'
 const PHASE_E = 'Extracting'
 const PHASE_T = 'Transforming'
 const PHASE_L = 'Loading'
+let PROXY_URL = 'http://www.whateverorigin.org/get?url='
+
+const fetch = window.fetch.bind(window)
+const useFetch = {
+  'fetch': fetch,
+  'fetchJsonp': fetchJsonp
+}
 
 class Etl extends Component {
-
-  fetchController = new AbortController()
 
   constructor(props) {
     super(props)
@@ -25,9 +30,20 @@ class Etl extends Component {
       // New recipes to add and update
       recipes: [],
 
+      // Handle resetting
+      resetting: false,
+      doingAsync: false,
+
+      // Proxy?
+      withProxy: true,
+
       // Count recipes 
       newRecipes: 0,
       updatedRecipes: 0,
+
+      // Values
+      valuePages: 1,
+      valueRecipes: 10,
 
       // Steps variables
       extractedData: false,
@@ -49,6 +65,10 @@ class Etl extends Component {
       finishedL: false,
       error: false,
     }
+
+    this.handlePagesChange = this.handlePagesChange.bind(this);
+    this.handleRecipesChange = this.handleRecipesChange.bind(this);
+    this.handleProxyChange = this.handleProxyChange.bind(this);
 
     this.fullProcess = this.fullProcess.bind(this)
     this.getPages = this.getPages.bind(this)
@@ -80,17 +100,22 @@ class Etl extends Component {
 
   componentDidMount() {
     this.mounted = true
-    this.resetComponent()
   }
 
   componentWillUnmount() {
-    this.fetchController.abort()
     this.mounted = false
   }
 
   resetComponent() {
+
     if (this.mounted) {
+
       this.setState({
+
+        // Resetting
+        resetting: true,
+        doingAsync: false,
+
         // Old recipes in the database
         recipesInDb: [],
 
@@ -100,6 +125,12 @@ class Etl extends Component {
         // Count recipes 
         newRecipes: 0,
         updatedRecipes: 0,
+
+        // Values
+        // Maybe let's not reset values :)
+        // valuePages: 1,
+        // valueRecipes: 10,
+        // withProxy: true,
 
         // Steps variables
         extractedData: false,
@@ -119,9 +150,33 @@ class Etl extends Component {
         finishedE: false,
         finishedT: false,
         finishedL: false,
-        error: false,
+        error: false
+
       })
+
+      if (!this.state.doingAsync) {
+        // If so, resetting state ends here
+        this.setState({resetting: false}, function() {
+          console.log('Reset NOT in loop, state should be false:  '+this.state.resetting)
+        })
+      } else {
+        // If so, resetting state ends in three specific functions
+        // Because it needs to break async functions
+        console.log('Reset happened IN loop, now it is: '+this.state.resetting)
+      }
     }
+  }
+
+  handlePagesChange(e) {
+    this.setState({valuePages: e.target.value})
+  }
+
+  handleRecipesChange(e) {
+    this.setState({valueRecipes: e.target.value})
+  }
+
+  handleProxyChange(e) {
+    this.setState({withProxy: !this.state.withProxy})
   }
 
   /* 
@@ -159,7 +214,7 @@ class Etl extends Component {
       this.setState({
         recipes: data,
         checkerE: '',
-        finishedE: true
+        finishedE: true,
       })
     }
   }
@@ -173,7 +228,7 @@ class Etl extends Component {
         this.setState({
           recipes: data,
           checkerT: '',
-          finishedT: true
+          finishedT: true,
         })
       } else {
         if (this.mounted) {
@@ -197,8 +252,6 @@ class Etl extends Component {
         updatedRecipes: data.updatedRecipes
       })
     }
-
-    // Add link to table and info that the page will reset
   }
 
   /* 
@@ -207,35 +260,64 @@ class Etl extends Component {
   getPages() {
 
     return new Promise((resolve, refuse) => {
-      // Fetch recipes from first page
-      fetchJsonp('http://www.whateverorigin.org/get?url=' + encodeURIComponent(RECIPES_URL),
-        {signal: this.fetchController.signal})
-      .then((response) => {return response.json()})
-      .then((json) => {
+      this.setState({doingAsync: true}, function() {
 
-        // Json data into HTML
-        let recipesHTML = htmlParser.parseFromString(json.contents, "text/html")
-        let recipesContent = recipesHTML.getElementById('content')
+        let fetchFunc = 'fetchJsonp'
+        let fetchUrlBase = RECIPES_URL
+        let fetchUrl = PROXY_URL + encodeURIComponent(fetchUrlBase)
+        if (!this.state.withProxy) {
+          fetchUrl = fetchUrlBase
+          fetchFunc = 'fetch'
+        }
 
-        // Get amount of available pages of recipes
-        let recipesLastPage = recipesContent.querySelector('.nav-links .dots').nextElementSibling.innerHTML
+        // Fetch recipes from first page 
+        useFetch[fetchFunc](fetchUrl)
+        .then((response) => {
+          if (!this.state.withProxy) return response.clone().text()
+          else return response.json()
+        })
+        .then((json) => {
 
-        // If we found the amount all is ok and resolve
-        // If we didn't find the amount display information
-        if (recipesLastPage) resolve(recipesLastPage)
-        else {
-          if (this.mounted) {
-            this.setState({checkerE: 'Failed to get amount of recipes pages.'})
+          let dataHere = json.contents 
+          if (!this.state.withProxy) dataHere = json
+
+          // Data into HTML
+          let recipesHTML = htmlParser.parseFromString(dataHere, "text/html")
+          let recipesContent = recipesHTML.getElementById('content')
+
+          // Get amount of available pages of recipes
+          let recipesLastPage = recipesContent.querySelector('.nav-links .dots').nextElementSibling.innerHTML
+
+          // If we found the amount all is ok and resolve
+          // If we didn't find the amount display information
+          if (recipesLastPage) {
+            if (this.state.resetting) {
+              this.setState({resetting: false, doingAsync: false}, function() {
+                refuse('Reset in getPages.')
+              })
+            } else {
+              resolve(recipesLastPage)
+            }
+          } else {
+            if (this.mounted) {
+              this.setState({
+                checkerE: 'Failed to get amount of recipes pages. Probably a proxy or CORS error. Check the console or try again.',
+                doingAsync: false
+              })
+              refuse()
+            }
           }
-          refuse()
-        }
-      }).catch((error) => {
-        if (this.mounted) {
-          this.setState({checkerE: 'Failed to get amount of recipes pages.'})
-          console.log('Fetch in getPages failed. ' + error)
-        }
-        refuse()
+        }).catch((error) => {
+          if (this.mounted) {
+            this.setState({
+              checkerE: 'Failed to get amount of recipes pages. Probably a proxy or CORS error. Check the console or try again.',
+              doingAsync: false
+            })
+            refuse('Fetch in getPages failed. ' + error)
+          }
+        })
       })
+    	
     })
   }
 
@@ -245,38 +327,68 @@ class Etl extends Component {
   fetchPage(page) {
 
     return new Promise((resolve, refuse) => {
-      fetchJsonp('http://www.whateverorigin.org/get?url=' + encodeURIComponent(RECIPES_URL + '/page/' + page), 
-        {signal: this.fetchController.signal})
-      .then((response) => {return response.json()})
+
+      let fetchFunc = 'fetchJsonp'
+      let fetchUrlBase = RECIPES_URL + '/page/' + page
+      let fetchUrl = PROXY_URL + encodeURIComponent(fetchUrlBase)
+      if (!this.state.withProxy) {
+        fetchUrl = fetchUrlBase
+        fetchFunc = 'fetch'
+      }
+
+      // Fetch recipes from first page 
+      useFetch[fetchFunc](fetchUrl)
+      .then((response) => {
+        if (!this.state.withProxy) return response.clone().text()
+        else return response.json()
+      })
       .then((json) => {
 
-        // Json data into HTML
-        let recipesHTML = htmlParser.parseFromString(json.contents, "text/html")
+        let dataHere = json.contents 
+        if (!this.state.withProxy) dataHere = json
+
+        // Data into HTML
+        let recipesHTML = htmlParser.parseFromString(dataHere, "text/html")
         let recipesContent = recipesHTML.getElementById('content')
 
         // Get children on recipes container - each is a single recipe
         let recipesArchives = recipesContent.getElementsByClassName('archives')[0].children
         let recipesURLs = []
 
-        // For each recipe, get URL to said recipe an add to array
+        // Recipes amount
+        let intValueRecipes = parseInt(this.state.valueRecipes)
+        let recipesAmount = intValueRecipes + 1
+        recipesAmount = parseInt(recipesAmount)
+
         //for (var i = 1; i < recipesArchives.length - 1; i++) {
-        for (var i = 1; i < 21; i++) {
+        for (var i = 1; i < recipesAmount; i++) {
           let recipeURL = recipesArchives[i].querySelector('.archive-post > a').href
           recipesURLs.push(recipeURL)
         }
 
         // If array isn't empty - resolve with data: URLs array
-        if (recipesURLs.length) resolve({data: recipesURLs})
-
-        // If array is empty - resolve with error, so the loop doesn't break
-        else resolve({error: 'Recipes URLs of page ' + page + ' did not load into the array.'})
+        if (recipesURLs.length) {
+          if (this.state.resetting) {
+            this.setState({resetting: false})
+            refuse('Reset happened in fetchPage.') 
+          } else {
+            resolve({data: recipesURLs})
+          }
+        } // If array is empty - resolve with error, so the loop doesn't break
+        else {
+          if (this.state.resetting) {
+            this.setState({resetting: false})
+            refuse('Reset happened in fetchPage.') 
+          } else {
+            resolve({error: 'Recipes URLs of page ' + page + ' did not load into the array.'})
+          }
+        }
 
       }).catch((error) => {
         if (this.mounted) {
-          this.setState({checkerE: 'Failed to get data from page ' + page + '.'})
-          console.log('Fetch in downloadRecipesHTML on page ' + page + ' failed. ' + error)
+          this.setState({checkerE: 'Failed to get data from page ' + page + '. Probably a proxy or CORS error. Check the console or try again.'})
+          refuse('Fetch in downloadRecipesHTML on page ' + page + ' failed. ' + error)
         }
-        refuse()
       })
     })
   }
@@ -286,26 +398,51 @@ class Etl extends Component {
    */
   fetchRecipe(recipeURL) {
     return new Promise((resolve, refuse) => {
-      fetchJsonp('http://www.whateverorigin.org/get?url=' + encodeURIComponent(recipeURL), 
-        {signal: this.fetchController.signal})
-      .then((response) => {return response.json()})
+    	
+      let fetchFunc = 'fetchJsonp'
+      let fetchUrlBase = recipeURL
+      let fetchUrl = PROXY_URL + encodeURIComponent(fetchUrlBase)
+      if (!this.state.withProxy) {
+        fetchUrl = fetchUrlBase
+        fetchFunc = 'fetch'
+      }
+
+      // Fetch recipes from first page 
+      useFetch[fetchFunc](fetchUrl)
+      .then((response) => {
+        if (!this.state.withProxy) return response.clone().text()
+        else return response.json()
+      })
       .then((json) => {
 
-        // Json data into HTML
-        let recipeHTML = htmlParser.parseFromString(json.contents, "text/html")
+        let dataHere = json.contents 
+        if (!this.state.withProxy) dataHere = json
+
+        // Data into HTML
+        let recipeHTML = htmlParser.parseFromString(dataHere, "text/html")
         let recipeContainer = recipeHTML.getElementsByClassName('wprm-recipe-container')[0].outerHTML
 
         if (recipeContainer) {
           // Answers with recipe container, 
           // you'll get data from container in the next step
-          resolve({data: recipeContainer})
+          if (this.state.resetting) {
+            this.setState({resetting: false})
+            refuse('Reset in fetchRecipe.')
+          } else {
+            resolve({data: recipeContainer})
+          }
         } else {
-          resolve({error: 'Cannot find recipe container at ' + recipeURL})
+          if (this.state.resetting) {
+            this.setState({resetting: false})
+            refuse('Reset in fetchRecipe.')
+          } else {
+            resolve({error: 'Cannot find recipe container at ' + recipeURL})
+          }
         }
 
       }).catch((error) => {
         if (this.mounted) {
-          this.setState({checkerE: 'Failed to get data from URL: ' + recipeURL})
+          this.setState({checkerE: 'Probably a proxy or CORS error. Check the console or try again. Failed to get data from URL: ' + recipeURL})
           console.log('Failed to get data from URL: '+ recipeURL + ' Error: '+ error)
         }
         refuse()
@@ -319,11 +456,16 @@ class Etl extends Component {
   async processRecipes(array) {
     let recipes = []
     let i = 0
+    let length = array.length
+
     for (const item of array) {
+      this.setState({doingAsync: true})
       i++
+
       if (this.mounted) {
         this.setState({checkerE: 'Extracting recipe ' + i + '...'})
       }
+
       await this.fetchRecipe(item).then((response) => {
 
         // If recipe returned data, add it to recipes array
@@ -332,6 +474,12 @@ class Etl extends Component {
         // If recipe returned error, log it in console
         else console.log(response.error)
       })
+
+      if (i === length) {
+        this.setState({doingAsync: false}, function() {
+          console.log('Loop ended, now it is: '+this.state.doingAsync)
+        })
+      }
     }
     return recipes
   }
@@ -341,8 +489,14 @@ class Etl extends Component {
    */
   async processPages(pages) {
     let allURLs = []
-    // Final product - "pages" instead of number in the middle !!!
-    for (let i = 1; i < 2; i++) {
+    let intValuePages = parseInt(this.state.valuePages)
+    let pagesAmount = intValuePages + 1
+    pagesAmount = parseInt(pagesAmount)
+
+    //for (let i = 1; i < pages; i++) {
+    for (let i = 1; i < pagesAmount; i++) {
+      this.setState({doingAsync: true})
+    	
       if (this.mounted) {
         this.setState({checkerE: 'Extracting page ' + i + '...'})
       }
@@ -354,6 +508,12 @@ class Etl extends Component {
         // If page returned error, log it in console
         else console.log(response.error)
       })
+
+      if ((i+1) === pagesAmount) {
+        this.setState({doingAsync: false}, function() {
+          console.log('Loop ended, now it is: '+this.state.doingAsync)
+        })
+      }
     }
     return allURLs
   }
@@ -515,7 +675,7 @@ class Etl extends Component {
     return new Promise((resolve, refuse) => {
       db.table('recipes').toArray()
       .then((recipes) => {
-        if (this.mounted) {
+        if (this.mounted && !this.state.resetting) {
           this.setState({
             recipesInDb: recipes,
             startedL: true,
@@ -523,6 +683,8 @@ class Etl extends Component {
           }, () => {
             resolve()
           })
+        } else {
+          refuse()
         }
       }).catch((error) => refuse(error))
     })
@@ -683,6 +845,34 @@ class Etl extends Component {
 
           { (!this.state.inFullProcess && !this.state.inStepsProcess) ? 
             <div className="etl__buttons">
+
+            <div className="etl__process_phase etl__process_steps">
+              <div className="etl__process_phase-title">
+                <span>Settings</span> 
+              </div>
+
+              <div className="etl__values">
+              	<label>
+                  <div className="etl__checkbox">
+                    <input type="checkbox" checked={this.state.withProxy} onChange={this.handleProxyChange} />
+                    <div className="etl__checkbox-fake"></div>
+                  </div>
+                  <span>Proxy?</span>
+                </label>
+                <label>
+                  <span className="etl__settings-info">You can disable proxy if you have CORS Chrome Extension installed to avoid proxy timeout issues.</span>
+                </label>
+                <label>
+                  <input type="text" value={this.state.valuePages} onChange={this.handlePagesChange} />
+                  <span>Pages</span>
+                </label>
+                <label>
+                  <input type="text" value={this.state.valueRecipes} onChange={this.handleRecipesChange} />
+                  <span>Recipes (1-28)</span>
+                </label>
+              </div>
+            </div>
+
               <div className="etl__buttons__wrap">
           		  <button onClick={this.fullProcess} className="btn">Full ETL Process</button>
               </div>
@@ -786,8 +976,12 @@ class Etl extends Component {
                           Loading has finished.
                         </div> 
                         <div className="etl__process_finished-details">
-                          Added <strong>{this.state.newRecipes}</strong> new recipes. <br/> 
-                          Updated <strong>{this.state.updatedRecipes}</strong> new recipes.
+
+                          Added <strong>{this.state.newRecipes}</strong> new 
+                          {this.state.newRecipes === 1 ? ' recipe.' : ' recipes.' }
+                          <br/> 
+                          Updated <strong>{this.state.updatedRecipes}</strong> 
+                          {this.state.updatedRecipes === 1 ? ' recipe.' : ' recipes.' }
 
                           <div className="menu__confirm-buttons">
                             <NavLink className="btn" to="/data">See the Data</NavLink>

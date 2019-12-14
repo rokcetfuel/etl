@@ -15,6 +15,7 @@ class Data extends Component {
     }
 
     this.loadTable = this.loadTable.bind(this)
+    this.saveToTxt = this.saveToTxt.bind(this)
   }
 
   componentDidMount() {
@@ -27,6 +28,18 @@ class Data extends Component {
     })
   }
 
+  saveToTxt(e, row) {
+
+    let textInput = JSON.stringify(row, null, 2)
+    const element = document.createElement("a")
+    const file = new Blob([textInput], {type: 'text/plain'})
+    element.href = URL.createObjectURL(file)
+    element.download = row.recipe_id + ".txt"
+    document.body.appendChild(element)
+    element.click()
+
+  }
+
   loadTable() {
     let tableData = JSON.parse(this.state.tableData)
     return (
@@ -34,13 +47,20 @@ class Data extends Component {
         options = {{
           pageSize: 20,
           pageSizeOptions: [20, 40, 60, 80, 100],
-          toolbar: false,
           headerStyle: {
             fontWeight: '700'
           }
         }}
+        title = ''
         columns = {this.state.tableHeaders}
         data = {tableData}
+        actions = {[
+          {
+            icon: 'save',
+            tooltip: 'Get Text file',
+            onClick: (e, row) => this.saveToTxt(e, row)
+          }
+        ]}
       />
     )
   }

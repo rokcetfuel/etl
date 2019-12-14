@@ -27,6 +27,7 @@
   "eslintConfig": {
     "extends": "react-app"
   },
+  "proxy": "https://www.skinnytaste.com",
   "browserslist": {
     "production": [
       ">0.2%",
